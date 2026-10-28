@@ -9,3 +9,8 @@ node_modules/
 dist/
 .pytest_cache/
 *.db
+*.db-*
+*.sqlite
+*.sqlite-*
+.coverage
+htmlcov/
