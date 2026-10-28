@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.local
+coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+e2e/.runtime/
+e2e/__pycache__/
