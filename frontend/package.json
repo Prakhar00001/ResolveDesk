@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:production": "npm run build && playwright test --config playwright.production.config.ts",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "preview": "vite preview"
   },
