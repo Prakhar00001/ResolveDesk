@@ -15,11 +15,20 @@ A complete support desk built for the Comhard Technologies practical assessment:
 - Backend-calculated total, open, in-progress, resolved, urgent, and overdue metrics; query invalidation after mutations and 30-second polling.
 - Responsive laptop/tablet interface, Lucide icons, accessible focus-managed dialogs, keyboard navigation, readable timestamps with exact-time tooltips, notifications, and loading/error/retry/empty states.
 - Reproducible, non-destructive seed: 3 agents, 12 tickets, all statuses/priorities, replies, notes, audit history, and both resolved and unresolved tickets older than 24 hours.
+- Render deployment Blueprint with persistent storage, same-origin compiled frontend hosting, database health checks, and a fail-closed shared-password access gate for the hosted assessment demo.
+
+## Hosted deployment
+
+**Recommended: one Render Python service with a persistent disk.** The repository is configured and production-mode tested, but **no public deployment is live yet**: a Render account connection and billing approval are still required. Current published baseline is about **$7.25/month** before taxes/usage overages; confirm the current estimate before creating resources.
+
+[Open Render deployment setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk) and follow [`DEPLOYMENT.md`](DEPLOYMENT.md). This is a real Blueprint setup link, not a claim of an already-deployed app. Render generates the shared access password; never put it in this README.
+
+**Groq is not required.** No AI-provider key is used by ResolveDesk. Revoke any key exposed in chat; do not add it to the repository or hosting environment.
 
 ## Prerequisites
 
 - **Python 3.11+** with `pip` and `venv`.
-- **Node.js 24 LTS recommended**, npm. The current test runner supports Node 20.19+, 22.12+, or 24+; verified here on Node 24.11.0, npm 11.6.1, and Python 3.11.9 on Windows.
+- **Node.js 24 LTS recommended**, npm. The current test runner supports Node 22.12+, 24+, or 26+; verified here on Node 24.11.0, npm 11.6.1, and Python 3.11.9 on Windows.
 - No separate database server, API keys, credentials, Docker, or cloud account required.
 - Installing dependencies and Chromium requires internet access. Package versions are locked in `frontend/package-lock.json`.
 
@@ -71,8 +80,14 @@ Templates: [`backend/.env.example`](backend/.env.example) and [`frontend/.env.ex
 | `DATABASE_URL` | Absolute SQLite URL for `backend/resolvedesk.db` | Backend loads `backend/.env`. SQLite relative URLs are relative to the process working directory; prefer an absolute path. |
 | `VITE_API_BASE_URL` | `/api` | Optional `frontend/.env.local`; public **build-time** value, never a secret. |
 | `E2E_PYTHON` | Backend virtualenv Python for this OS | Optional browser-test interpreter override. |
+| `APP_ENV` | Unset locally | `production` enforces the access gate and compiled frontend configuration. |
+| `APP_ACCESS_USERNAME` | `reviewer` | Hosted demo's shared Basic-auth username. |
+| `APP_ACCESS_PASSWORD` | Unset locally | Render generates it; production requires at least 16 characters. Configuring it enables the gate locally too. Never commit it. |
+| `FRONTEND_DIST` | Not hosted by the normal local API command | `backend/start.py` defaults it to the compiled `frontend/dist` directory. |
+| `SEED_DEMO` | `false` in the hosting entry point | Blueprint sets `true`; seeding is idempotent and runs at startup on the persistent disk. |
+| `PORT` | `10000` in the hosting entry point | Render supplies its service port. |
 
-Vite proxies `/api` to `http://localhost:8000` during development (and Vite preview). The production static bundle does **not** include that proxy. API CORS permits localhost/127.0.0.1 frontend origins on ports 5173 and 4173. For different hosts, update the backend origin allowlist or serve both behind a same-origin reverse proxy.
+Vite proxies `/api` to `http://localhost:8000` during development (and Vite preview). The production static bundle does **not** include that proxy. The Render setup serves compiled React and the API through the same FastAPI service, so no production proxy or CORS changes are needed. API CORS permits localhost/127.0.0.1 frontend origins on ports 5173 and 4173. For different hosts, update the backend origin allowlist or serve both behind a same-origin reverse proxy.
 
 ## API overview
 
@@ -89,6 +104,8 @@ All application endpoints begin with `/api`.
 | GET / POST | `/tickets/{id}/entries` | List / add public reply or internal note (`201`) |
 | GET | `/tickets/{id}/activities` | Chronological audit history |
 | GET | `/dashboard` | Six live database aggregates |
+
+`GET /healthz` is a separate, minimal readiness endpoint outside `/api`. It probes the database and returns 200/503. In hosted production mode, all other routes—including assets and API docs—require the shared access password.
 
 List query parameters: `search`, `status`, `priority`, `assignee_id`, `sort=updated|priority`. All filters combine with AND; sorting is applied in SQL. Priority order is Urgent → High → Medium → Low, then updated time descending; IDs break ties. The API returns arrays; UI pagination occurs after database filtering, suitable for this small assessment dataset.
 
@@ -180,9 +197,10 @@ On Linux CI you may need `npx playwright install --with-deps chromium` with suit
 
 ### Executed verification
 
-- **89 backend tests:** CRUD, required-field/enum/email validation, chronological ordering, actual-change audit logging, transaction rollback, SQL AND filters and priority sorting, dashboard counts, strict overdue boundaries, foreign keys, soft deletion, seed idempotence, safe errors, and real HTTP persistence across two backend processes.
+- **197 backend tests passed, 3 skipped:** CRUD, required-field/enum/email validation, chronological ordering, actual-change audit logging, transaction rollback, SQL AND filters and priority sorting, dashboard counts, strict overdue boundaries, foreign keys, soft deletion, seed idempotence, safe errors, real HTTP persistence across backend restarts, hosted access protection, secure frontend serving, health checks, and production entry-point validation. The three skips require symlink privileges unavailable on this Windows machine.
 - **31 frontend tests:** API contracts/errors, input limits/validation, timestamps, timelines, component workflows, and rapid filter/reset/back-navigation regressions.
-- **3 live Chromium scenarios:** full ticket lifecycle; search, combined filters, sorting and rapid control changes; metric refresh after external mutation. These include desktop/tablet screenshots with no document overflow at 1440px and 768px.
+- **3 development-mode live Chromium scenarios:** full ticket lifecycle; search, combined filters, sorting and rapid control changes; metric refresh after external mutation. These include desktop/tablet screenshots with no document overflow at 1440px and 768px.
+- **1 production-mode live Chromium scenario:** the actual compiled React build served by FastAPI, anonymous access blocked, authenticated ticket creation and internal note, reload persistence, fresh detail deep-link navigation, and metrics. Run with `npm run test:production` from `frontend/`.
 - Frontend TypeScript, strict E2E TypeScript, production build, Python dependency checks, and npm security audit.
 
 Screenshots and HTML reports are generated under ignored `frontend/test-results/` and `frontend/playwright-report/`; `npx playwright show-report` opens the report. Screenshots verify layout dimensions and aid review; this is not a pixel-diff visual regression suite.
@@ -202,7 +220,7 @@ Screenshots and HTML reports are generated under ignored `frontend/test-results/
 
 All mandatory features in the supplied textual brief are implemented and covered by the checks above. There are no known blocking defects from the executed suites. Remaining intentional limitations:
 
-- No authentication, authorization, customer portal, external email delivery, file attachments, or configurable SLA workflows. **Internal notes are visually distinct but not access-controlled. Do not expose this unauthenticated demo publicly.**
+- No per-user accounts, roles, customer portal, external email delivery, file attachments, or configurable SLA workflows. **Local development remains unauthenticated by default.** Hosted production requires a shared Basic-auth password; everyone with it can read and modify all tickets and internal notes. This protects an assessment demo, not a real multi-tenant help desk.
 - No dark mode, agent-management UI, bulk actions, restore UI, or optimistic-concurrency/version checks. Last committed edit wins for simultaneous operators.
 - No server-side pagination or migrations; SQLite is appropriate for the assessment, not a high-write multi-instance deployment.
 - Browser verification uses Chromium on Windows, not Firefox/Safari or native mobile devices. Non-Windows commands are documented but not executed locally.
@@ -210,14 +228,14 @@ All mandatory features in the supplied textual brief are implemented and covered
 
 ## Deployment guidance
 
-This repository provides a buildable application, **not a public-production security configuration** or one-click deployment button.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the complete Render launch procedure, cost review, generated password, verification checklist, backups, and troubleshooting.
 
-1. Build with `npm ci && npm run build` in `frontend/`.
-2. Serve `frontend/dist` through a static web server with SPA fallback to `index.html` for `/tickets/{id}` deep links.
-3. Install Python dependencies into a server virtualenv, initialize the database, and run `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000` behind a process supervisor, without `--reload`.
-4. Reverse-proxy `/api` to Uvicorn on the same origin; do not expose the Vite development server. Use HTTPS.
-5. Put the SQLite file on a persistent, backed-up local volume with write permission for the API process. Avoid ephemeral container filesystems, network-filesystem SQLite, and multiple write-heavy replicas. Use SQLite's backup tooling rather than an inconsistent live file copy.
-6. Before any public deployment, add real access controls (including internal-note visibility), rate limiting, reviewed migrations, environment-specific origins, backups and monitoring. Do not put secrets into `VITE_` variables.
+- Root [`render.yaml`](render.yaml) builds React and FastAPI in one native Python service. [`backend/start.py`](backend/start.py) validates production configuration, optionally seeds, and starts one worker on the platform port.
+- The attached disk is mounted at `/var/data`; `DATABASE_URL=sqlite:////var/data/resolvedesk.db` preserves tickets across deploys/restarts. A free ephemeral filesystem is **not** a durable deployment.
+- HTTPS is provided by Render. A generated shared access password protects UI, assets, API, and docs; only the minimal `/healthz` probe is public. Startup fails closed without a suitable password and compiled frontend.
+- Automatic deploys are off. Use Manual Deploy for reviewed changes. Disk-backed redeploys have brief downtime; this setup does not support horizontal scaling.
+- Local production checks passed, but **Render provisioning and live-URL verification are pending account connection and billing approval**. No real public URL is fabricated here.
+- Use fictional assessment data only. Real customer use still needs per-user authorization, rate limiting, reviewed migrations, backups, and monitoring. No secret belongs in `VITE_` variables.
 
 ## AI tools usage
 

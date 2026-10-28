@@ -102,9 +102,29 @@ status is not `Resolved` AND creation time is strictly before now minus 24 hours
 it does not use updated time. Soft deletion retains all audit records in SQLite
 but hides the ticket and its nested resources from the API.
 
-CORS permits localhost and 127.0.0.1 on ports 5173 and 4173. This is a local demo API:
-there is no authentication, authorization, email sending, or external service access.
-Internal notes are not access-controlled, so do not expose this service publicly.
+CORS permits localhost and 127.0.0.1 on ports 5173 and 4173. The normal local API
+command remains unauthenticated by default. Do not expose that configuration publicly.
+
+## Hosted assessment demo
+
+The root `render.yaml` runs `python backend/start.py` from the repository root. It
+builds/serves React on the same origin as this API, stores SQLite on a paid persistent
+disk, and uses a Render-generated shared Basic-auth password. Full instructions,
+current cost estimate, account-approval steps, and the pending live-deployment status
+are in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+
+Production requires `APP_ENV=production`, `APP_ACCESS_PASSWORD` of at least 16
+characters, a valid compiled frontend, and an explicit persistent `DATABASE_URL`.
+`APP_ACCESS_USERNAME` defaults to `reviewer`. `start.py` supplies the frontend path,
+validates configuration, optionally seeds with `SEED_DEMO=true`, then starts one
+worker on `PORT` (default 10000). The Blueprint configures the disk at `/var/data`
+and database URL `sqlite:////var/data/resolvedesk.db`.
+
+Only GET/HEAD `/healthz` bypasses the gate; it probes the database and returns a
+minimal 200/503 response. UI, assets, API, and docs require the password. This is a
+shared demo gate, not per-user authorization: everyone with the password sees all
+internal notes. There is no outbound email or external AI/API integration. Groq is
+not needed. Use HTTPS and fictional data; never commit access credentials.
 
 ## Tests
 
@@ -120,4 +140,9 @@ persistence across engines, SQLite foreign-key/check constraints, and rollback w
 activity insertion fails during create/update/entry/delete. Additional tests cover
 required/trimmed descriptions, description database constraints, named assignment
 activities, sanitized/logged 500 errors with rollback, and backend-specific engine
-configuration without requiring a PostgreSQL driver.
+configuration without requiring a PostgreSQL driver. Hosting tests cover the shared
+access gate, malformed credentials, safe frontend routing, security headers and
+readiness failures. Production subprocess tests verify `start.py`, real HTTP,
+persistence and idempotent seeding across restarts, and rejection of invalid
+configuration before database writes. The production browser smoke command is
+`npm run test:production` from `frontend/`.
