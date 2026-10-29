@@ -110,9 +110,9 @@ command remains unauthenticated by default. Do not expose that configuration pub
 The root `render.yaml` runs `python backend/start.py` from the repository root. It
 builds/serves React on the same origin as this API on Render Free, stores hosted data
 in Neon Free PostgreSQL, and uses a Render-generated shared Basic-auth password.
-There is no paid disk. Full instructions, free-tier limits, account-connection steps,
-and the pending live-deployment status
-are in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+There is no paid disk. Live demo: [resolvedesk-2gyg.onrender.com](https://resolvedesk-2gyg.onrender.com).
+Full instructions, free-tier limits, account-connection steps, and live verification
+scope are in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 Production requires `APP_ENV=production`, `APP_ACCESS_PASSWORD` of at least 16
 characters, a valid compiled frontend, and an explicit persistent `DATABASE_URL`.

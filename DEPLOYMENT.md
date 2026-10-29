@@ -1,6 +1,8 @@
 # Free deployment: Render + Neon
 
-**Status:** free-hosting configuration is committed in this repository; no public service or Neon database has been created by the coding assistant. Your Render/Neon account connections are required. No Groq key is needed.
+**Status: deployed.** Live demo: [https://resolvedesk-2gyg.onrender.com](https://resolvedesk-2gyg.onrender.com). Render service ID: `srv-dbh9jjuc6qcc73ep58ig`. The project owner created the service and confirmed it is working. The assistant verified public health and anonymous-access protection; authenticated live workflows were not independently retested. No credentials are published, and no Groq key is needed.
+
+The steps below are for creating another instance or reviewing the existing configuration.
 
 ## Fast setup
 
@@ -22,7 +24,7 @@ The app accepts `postgresql://`, `postgres://`, or `postgresql+psycopg://` URLs 
 5. Create/deploy the service. It builds React and installs Python dependencies, then initializes/seeds the Neon database at startup.
 6. Once Live, open the actual HTTPS URL assigned by Render. Username: **`reviewer`**. Retrieve the generated **`APP_ACCESS_PASSWORD`** from Render's **Environment** settings and use it in the browser's login prompt.
 
-Share the access password privately with reviewers; never put it in a README or chat. Account verification requirements can vary. There is no claimed public URL until your account creates the service.
+Share the access password privately with reviewers; never put it in a README or chat. Account verification requirements can vary. A new instance receives its own assigned Render URL; the existing demo URL is listed at the top of this guide.
 
 **Important:** if updating an existing Blueprint, Render does not prompt for newly added `sync: false` secrets. Set `DATABASE_URL` manually in its Environment settings. A previously paid service/disk is not guaranteed to disappear just because this file changed: export needed data and explicitly remove the old paid disk/resources and select Free. Verify the dashboard estimate before applying changes.
 
@@ -93,7 +95,7 @@ A new Neon database is initialized empty and optionally seeded. **Existing local
 
 Local validation after the switch: **227 backend tests passed, 7 skipped**, run in two serial groups after a combined run timed out. Four skips require a real PostgreSQL test URL; three require unavailable Windows symlink privileges. The existing compiled-production browser test was previously verified, and deployment changes do not change frontend code.
 
-PostgreSQL URL/driver configuration, TLS option preservation, connection settings, safe errors, SQLite regression behavior and the startup PostgreSQL requirement are unit-tested. Real PostgreSQL API tests are included in `backend/tests/test_postgres.py` and run in `.github/workflows/postgres.yml` using a disposable PostgreSQL service. A passing GitHub Actions result is separate from a successful connection to your Neon account; live Neon/Render checks still require account setup.
+PostgreSQL URL/driver configuration, TLS option preservation, connection settings, safe errors, SQLite regression behavior and the startup PostgreSQL requirement are unit-tested. Real PostgreSQL API tests are included in `backend/tests/test_postgres.py` and run in `.github/workflows/postgres.yml` using a disposable PostgreSQL service. A passing GitHub Actions result is separate from a successful connection to your Neon account. On the deployed service, `/healthz` returned `{"status":"ok"}` and the anonymous homepage returned HTTP 401. The owner reported successful use; authenticated CRUD and redeploy-persistence checks remain owner-run acceptance steps.
 
 ```sh
 # backend/ — Windows

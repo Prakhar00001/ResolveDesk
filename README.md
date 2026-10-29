@@ -1,6 +1,10 @@
 # ResolveDesk
 
-A complete support desk built for the Comhard Technologies practical assessment: React + TypeScript on the frontend, FastAPI + SQLAlchemy on the backend, and persistent SQLite storage. All tickets, conversations, activities, filters, and dashboard metrics use the real API and database.
+**Live demo:** [resolvedesk-2gyg.onrender.com](https://resolvedesk-2gyg.onrender.com)
+
+The hosted assessment demo requires shared access credentials. Request them privately from the project owner; no password is published here. Render Free may take about a minute to wake after inactivity.
+
+A complete support desk built for the Comhard Technologies practical assessment: React + TypeScript on the frontend, FastAPI + SQLAlchemy on the backend, SQLite for local development, and Neon PostgreSQL for persistent hosted storage. All tickets, conversations, activities, filters, and dashboard metrics use the real API and database.
 
 > Assessment scope follows the detailed requirements supplied with this project. The original challenge PDF was not present in the repository, so PDF-specific requirements beyond that brief have not been independently verified.
 
@@ -19,9 +23,9 @@ A complete support desk built for the Comhard Technologies practical assessment:
 
 ## Hosted deployment
 
-**Free setup: Render Free for the app + Neon Free PostgreSQL for persistent data.** No paid disk is configured. Create a Neon Free project, then paste its pooled connection URI **privately into Render's `DATABASE_URL` field** during Blueprint setup. **No public deployment is live yet**; connecting your accounts is still required. Render sleeps after 15 idle minutes, so allow about a minute for cold starts. Stay within both providers' free quotas; see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+**Live at [https://resolvedesk-2gyg.onrender.com](https://resolvedesk-2gyg.onrender.com)** using Render Free for the app and Neon Free PostgreSQL for persistent data. No paid disk is configured. The public `/healthz` probe was verified healthy, and anonymous homepage access was verified to return 401. The project owner confirmed the deployed application is working; authenticated live workflows were not independently retested by the assistant. Render sleeps after 15 idle minutes, so allow about a minute for cold starts. Stay within both providers' free quotas; see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-[Open Render deployment setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk) and follow [`DEPLOYMENT.md`](DEPLOYMENT.md). This is a real Blueprint setup link, not a claim of an already-deployed app. Render generates the shared access password; never put it in this README.
+To create your own instance, [open Render deployment setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk) and follow [`DEPLOYMENT.md`](DEPLOYMENT.md). Existing deployment credentials are managed privately in Render; never put the password or database URI in this README.
 
 **Groq is not required.** No AI-provider key is used by ResolveDesk. Revoke any key exposed in chat; do not add it to the repository or hosting environment.
 
@@ -235,7 +239,7 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the fast Render Free + Neon Free setup,
 - There is no paid disk. Neon stores data independently of Render's ephemeral filesystem; set its pooled URI directly in Render's private `DATABASE_URL`. `REQUIRE_POSTGRES=true` prevents accidental SQLite fallback.
 - HTTPS is provided by Render. A generated shared access password protects UI, assets, API, and docs; only the minimal `/healthz` probe is public. Startup fails closed without a suitable password and compiled frontend.
 - Automatic deploys are off. Use Manual Deploy for reviewed changes. Render Free sleeps while idle and both providers impose usage quotas; this is an assessment demo, not an uptime-guaranteed production deployment.
-- Local configuration checks passed; **live PostgreSQL/Neon verification and Render provisioning require account setup**. PostgreSQL CI is configured separately. No real public URL or unexecuted database-test success is fabricated here.
+- The live deployment is linked above. Public health and anonymous-access protection were checked; the owner confirmed application functionality. Authenticated live CRUD and redeploy-persistence checks still require the owner's credentials and are not claimed as independently executed by the assistant.
 - Use fictional assessment data only. Real customer use still needs per-user authorization, rate limiting, reviewed migrations, backups, and monitoring. No secret belongs in `VITE_` variables.
 
 ## AI tools usage
