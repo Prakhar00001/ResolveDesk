@@ -513,8 +513,8 @@ def test_engine_configuration_is_backend_specific(monkeypatch, url, is_sqlite):
     monkeypatch.setattr(database.event, "listens_for", listen)
     assert make_engine(url) is fake_engine
     if is_sqlite:
-        create_engine.assert_called_once_with(url, connect_args={"check_same_thread": False, "timeout": 30})
+        create_engine.assert_called_once_with(database.normalize_database_url(url), connect_args={"check_same_thread": False, "timeout": 30})
         listen.assert_called_once_with(fake_engine, "connect")
     else:
-        create_engine.assert_called_once_with(url)
+        create_engine.assert_called_once_with(database.normalize_database_url(url), poolclass=database.NullPool, connect_args={"connect_timeout": 10})
         listen.assert_not_called()

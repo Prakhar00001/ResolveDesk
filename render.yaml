@@ -1,20 +1,17 @@
-# Paid compute + persistent disk: review the Render cost estimate before applying.
-# All traffic goes to one native Python service; its build also compiles React.
+# Free web service; durable data lives in a separate Neon Free PostgreSQL project.
+# Supply Neon's connection URI privately in Render, never in this file.
 services:
   - type: web
     name: resolvedesk
     runtime: python
     region: singapore
-    plan: 0.5c-512mb
+    plan: free
     numInstances: 1
     autoDeployTrigger: "off"
     buildCommand: python -m pip install -r backend/requirements.txt && npm ci --prefix frontend --include=dev && npm run build --prefix frontend
     startCommand: python backend/start.py
     healthCheckPath: /healthz
-    disk:
-      name: resolvedesk-data
-      mountPath: /var/data
-      sizeGB: 1
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.14
@@ -23,7 +20,9 @@ services:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        value: sqlite:////var/data/resolvedesk.db
+        sync: false
+      - key: REQUIRE_POSTGRES
+        value: "true"
       - key: APP_ACCESS_USERNAME
         value: reviewer
       - key: APP_ACCESS_PASSWORD

@@ -5,7 +5,7 @@ import sys
 
 import uvicorn
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import ArgumentError
+from sqlalchemy.exc import SQLAlchemyError
 
 BACKEND = Path(__file__).resolve().parent
 
@@ -18,15 +18,21 @@ def prepare():
     load_dotenv(BACKEND / ".env")
     os.environ.setdefault("FRONTEND_DIST", str(BACKEND.parent / "frontend" / "dist"))
     production = os.getenv("APP_ENV", "").lower() == "production"
-    if production:
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise RuntimeError("Production requires an explicit DATABASE_URL on persistent storage")
+    require_postgres = os.getenv("REQUIRE_POSTGRES", "false").lower()
+    if require_postgres not in {"true", "false"}:
+        raise RuntimeError("REQUIRE_POSTGRES must be true or false")
+    database_url = os.getenv("DATABASE_URL")
+    if (production or require_postgres == "true") and not database_url:
+        raise RuntimeError("Production or REQUIRE_POSTGRES requires an explicit DATABASE_URL")
+    if database_url:
         try:
             url = make_url(database_url)
-        except ArgumentError:
+            url.port
+        except (SQLAlchemyError, ValueError, TypeError):
             raise RuntimeError("DATABASE_URL is not a valid SQLAlchemy connection URL") from None
-        if url.get_backend_name() == "sqlite":
+        if require_postgres == "true" and url.drivername not in {"postgres", "postgresql", "postgresql+psycopg"}:
+            raise RuntimeError("REQUIRE_POSTGRES requires a PostgreSQL DATABASE_URL using psycopg")
+        if production and url.get_backend_name() == "sqlite":
             filename = Path(url.database or "")
             if not url.database or url.database == ":memory:" or not filename.is_absolute():
                 raise RuntimeError("Production SQLite requires an absolute database file path")
@@ -45,11 +51,11 @@ def prepare():
     # Validate the access gate and compiled frontend before performing any writes.
     from app.main import app  # noqa: F401
 
-    if seed_demo == "true":
-        from app.db.database import init_database
-        from app.db.seed import seed
+    from app.db.database import init_database
 
-        init_database()
+    init_database()
+    if seed_demo == "true":
+        from app.db.seed import seed
         added = seed()
         print(f"Demo initialization: {added} tickets added; existing records preserved.", flush=True)
     return port
@@ -58,6 +64,9 @@ def prepare():
 if __name__ == "__main__":
     try:
         port = prepare()
+    except SQLAlchemyError:
+        print("ResolveDesk startup failed: Database operation failed; check connectivity and DATABASE_URL", file=sys.stderr)
+        raise SystemExit(1) from None
     except (RuntimeError, ValueError) as error:
         # Never print an environment dictionary, connection URL, or access password.
         print(f"ResolveDesk startup failed: {error}", file=sys.stderr)
