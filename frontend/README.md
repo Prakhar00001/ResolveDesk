@@ -19,7 +19,7 @@ npm test
 npm run build
 ```
 
-The recommended Render deployment serves this compiled `dist` through FastAPI on the same origin as `/api`, with a shared access password and persistent database; see [`../DEPLOYMENT.md`](../DEPLOYMENT.md). No separate frontend service or Groq key is required. No live cloud URL exists until the account owner creates the Blueprint and approves billing.
+The recommended Render Free + Neon Free deployment serves this compiled `dist` through FastAPI on the same origin as `/api`, with a shared access password and persistent database; see [`../DEPLOYMENT.md`](../DEPLOYMENT.md). No separate frontend service or Groq key is required. No live cloud URL exists until the account owner connects Neon and creates the Free Render Blueprint. The app sleeps when idle; allow about a minute for a cold start.
 
 For alternative production hosts, serve `dist` with an SPA fallback to `index.html`, and reverse-proxy `/api` to the backend (or configure the API URL before building). `npm run preview` also proxies `/api` to `http://localhost:8000`, because Vite's preview server inherits `server.proxy` when `preview.proxy` is unset. This local preview behavior does not configure your production hosting; a deployed static build still needs the reverse proxy or a build-time API URL.
 

@@ -21,7 +21,7 @@ python -m uvicorn app.main:app --reload --port 8000
 ```
 
 The default database is `backend/resolvedesk.db` regardless of working directory.
-Optionally copy `.env.example` to `.env` and set `DATABASE_URL` (SQLite only).
+Optionally copy `.env.example` to `.env` and set `DATABASE_URL` (SQLite locally or PostgreSQL/Neon).
 An explicit relative SQLite URL is relative to the process working directory.
 Startup also creates missing tables; it does not seed automatically. The seed command
 adds 3 demo agents and 12 demo tickets with public replies/internal notes. It never
@@ -108,17 +108,22 @@ command remains unauthenticated by default. Do not expose that configuration pub
 ## Hosted assessment demo
 
 The root `render.yaml` runs `python backend/start.py` from the repository root. It
-builds/serves React on the same origin as this API, stores SQLite on a paid persistent
-disk, and uses a Render-generated shared Basic-auth password. Full instructions,
-current cost estimate, account-approval steps, and the pending live-deployment status
+builds/serves React on the same origin as this API on Render Free, stores hosted data
+in Neon Free PostgreSQL, and uses a Render-generated shared Basic-auth password.
+There is no paid disk. Full instructions, free-tier limits, account-connection steps,
+and the pending live-deployment status
 are in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 Production requires `APP_ENV=production`, `APP_ACCESS_PASSWORD` of at least 16
 characters, a valid compiled frontend, and an explicit persistent `DATABASE_URL`.
 `APP_ACCESS_USERNAME` defaults to `reviewer`. `start.py` supplies the frontend path,
 validates configuration, optionally seeds with `SEED_DEMO=true`, then starts one
-worker on `PORT` (default 10000). The Blueprint configures the disk at `/var/data`
-and database URL `sqlite:////var/data/resolvedesk.db`.
+worker on `PORT` (default 10000). The Blueprint sets `REQUIRE_POSTGRES=true`; enter
+Neon's pooled connection URI directly in Render's private `DATABASE_URL` field.
+`postgresql://` and `postgres://` normalize to psycopg 3 without losing SSL options.
+PostgreSQL uses `NullPool` and a 10-second connection timeout. Local SQLite remains
+the default; no local data is automatically migrated. Real PostgreSQL tests require
+`TEST_POSTGRES_URL` and are configured in the repository's PostgreSQL CI workflow.
 
 Only GET/HEAD `/healthz` bypasses the gate; it probes the database and returns a
 minimal 200/503 response. UI, assets, API, and docs require the password. This is a

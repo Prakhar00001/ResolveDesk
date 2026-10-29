@@ -1,149 +1,121 @@
-# Deploy ResolveDesk to Render
+# Free deployment: Render + Neon
 
-## Status and platform choice
+**Status:** free-hosting configuration is committed in this repository; no public service or Neon database has been created by the coding assistant. Your Render/Neon account connections are required. No Groq key is needed.
 
-**The repository is deployment-ready; a public cloud deployment has not yet been created.** Launching requires your Render account, connecting this GitHub repository, and approving Render's paid service estimate. No Render account/API access was available to the coding assistant. Do not interpret the locally tested production configuration as an already-live URL.
+## Fast setup
 
-Use **one Render native Python web service with a 1 GB persistent disk**. Render's Python runtime includes Node and npm, so its build can compile React and install FastAPI without Docker. FastAPI serves the built UI and API from the same HTTPS origin; this eliminates production CORS and frontend/API URL coordination. SQLite stays on the attached disk, not the service's ephemeral source filesystem.
+### 1. Create the database — Neon Free
 
-This is suitable for a small assessment demo with a few reviewers. It is not a multi-tenant production help desk.
+1. Sign in at [Neon](https://console.neon.tech/) and create a **Free** PostgreSQL project. Choose a region close to Render's Singapore service when available.
+2. Click **Connect**, select the database/role, and enable **connection pooling**.
+3. Copy only the PostgreSQL **connection URI**, not the surrounding `psql` command. Retain `sslmode=require` and any `channel_binding=require` parameter Neon supplies.
+4. Keep this URI private. It contains a database password. **Do not paste it into chat or commit it.**
 
-### Expected cost — approval required
+The app accepts `postgresql://`, `postgres://`, or `postgresql+psycopg://` URLs and uses the installed psycopg 3 driver. Neon supplies a complete encoded URL; do not manually edit its password.
 
-Render's published pricing checked during this change lists:
+### 2. Create the application — Render Free
 
-| Resource | Configuration | Published monthly baseline |
+1. Open [ResolveDesk's Render setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk).
+2. Sign in, connect `Prakhar00001/ResolveDesk`, branch `main`, and use the root **`render.yaml`**. Alternatively choose **New → Blueprint** in Render.
+3. When prompted for **`DATABASE_URL`**, paste the private Neon URI **directly into Render**.
+4. Confirm the service plan is **Free**, there is **no disk**, and no paid database or workspace upgrade is selected. The Blueprint creates only the web service; Neon is managed separately.
+5. Create/deploy the service. It builds React and installs Python dependencies, then initializes/seeds the Neon database at startup.
+6. Once Live, open the actual HTTPS URL assigned by Render. Username: **`reviewer`**. Retrieve the generated **`APP_ACCESS_PASSWORD`** from Render's **Environment** settings and use it in the browser's login prompt.
+
+Share the access password privately with reviewers; never put it in a README or chat. Account verification requirements can vary. There is no claimed public URL until your account creates the service.
+
+**Important:** if updating an existing Blueprint, Render does not prompt for newly added `sync: false` secrets. Set `DATABASE_URL` manually in its Environment settings. A previously paid service/disk is not guaranteed to disappear just because this file changed: export needed data and explicitly remove the old paid disk/resources and select Free. Verify the dashboard estimate before applying changes.
+
+### 3. Check the live deployment
+
+- `/healthz` works without a password and returns minimal health information only.
+- UI, API, assets and `/docs` require the shared password.
+- Create a ticket, change status/priority/assignee, add a public reply/internal note, and verify activity history.
+- Open a ticket's detail URL in a fresh tab and refresh it.
+- Use **Manual Deploy → Deploy latest commit**, wait for Live again, and verify your ticket and conversation survived. Data lives in Neon, not Render's temporary filesystem.
+- Test search, combined filters, priority sorting and dashboard counts.
+- Delete only your test ticket; verify counts update.
+
+Automatic deploys are off. Deploy reviewed changes manually. Check the repository's **Actions → PostgreSQL compatibility** result before deploying database changes.
+
+## Why this setup is free and durable
+
+| Component | Plan | Role |
 | --- | --- | --- |
-| Web service | `0.5c-512mb`, one instance | $7 |
-| Persistent disk | 1 GB | $0.25 |
-| Hobby workspace | No Pro workspace required | $0 |
-| **Total baseline** | Before tax and metered overages | **$7.25/month** |
+| Render Python web service | Free | FastAPI serves both compiled React and `/api` on one HTTPS origin |
+| Neon PostgreSQL | Free | Persistent tickets, entries, agents and activity history |
+| Local development | SQLite | Existing zero-configuration workflow remains unchanged |
 
-Review **the current estimate in your own Render dashboard** before approving. Prices, bandwidth/build-minute allowances, taxes, and other usage charges can change. No billable resources have been provisioned by this change.
+Render Free's filesystem is ephemeral, so **SQLite is forbidden by the hosted Blueprint** using `REQUIRE_POSTGRES=true`. Missing/invalid database configuration stops startup instead of silently using a temporary database. No paid persistent disk is needed.
 
-**Do not switch this blueprint to a free service without changing storage architecture.** Render's free web services cannot attach a persistent disk; SQLite on an ephemeral filesystem would lose tickets during restarts/redeploys. A frontend-only Vercel deployment also does not provide persistent SQLite for this backend.
+**Free-tier limitations:**
 
-## Deploy steps
+- Render sleeps after 15 minutes without inbound traffic. The next visit can take about a minute to wake. Open the app a couple of minutes before your interview.
+- Render grants 750 free service hours per workspace/month, shared with your other free services. Bandwidth/build-minute quotas also apply.
+- Neon currently advertises 1 GB database storage and 100 CU-hours per project/month on Free. Compute can suspend while idle; durable data remains stored. Quota exhaustion can interrupt availability.
+- An open dashboard polls every 30 seconds, and health checks query the database while the service runs. Close unused demo tabs rather than keeping the app/database active continuously.
+- Free plans are for assessment/hobby use, not production uptime guarantees. Do not use keep-alive services to defeat sleep behavior.
+- Stay on Free, monitor usage and spend settings, and do not opt into metered upgrades unintentionally. Render can charge usage overages if a payment method is present; without one, services/builds may be suspended at quota limits.
+- Render's own free PostgreSQL expires after 30 days; **this setup uses Neon instead**.
 
-1. Sign in to [Render](https://dashboard.render.com/) using your own account. Do not paste account credentials, API tokens, or card information into chat.
-2. Open the repository's [Render deployment setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk). Alternatively, choose **New → Blueprint** in Render and connect `Prakhar00001/ResolveDesk`, branch `main`.
-3. Grant the Render GitHub App access to this repository if prompted. Use the root **`render.yaml`**; do not set a `backend` root directory, because the build needs `frontend/` too.
-4. Review the configuration and billing estimate. It creates only one Python web service, in Singapore, with one attached disk at `/var/data`. Change the region before creation if appropriate for your audience.
-5. Approve and create the Blueprint only if you accept the charges. The build installs backend dependencies and runs `npm ci` and the frontend production build.
-6. Render generates **`APP_ACCESS_PASSWORD`** securely. When the service is Live, reveal it in the service's **Environment** settings. The username is **`reviewer`**. Keep this password in a password manager and share it with interviewers through a private channel, not in GitHub or chat.
-7. Open the **actual HTTPS URL assigned by Render**, visible in the service dashboard. Your browser prompts for the shared username and password. No exact public hostname is claimed in this repository because the service has not yet been created.
-8. Perform the post-deploy acceptance checks below. Redeploy once to verify persistence on the actual disk.
-
-Automatic deploys are intentionally **off** in the Blueprint. To publish later changes, use Render's **Manual Deploy → Deploy latest commit** after reviewing/testing them. You can deliberately enable automatic deploys later in the dashboard. Do not delete/recreate the persistent disk when deploying changes.
+See current [Render Free limits](https://render.com/docs/free) and [Neon pricing](https://neon.com/pricing); providers can change their offers.
 
 ## Runtime configuration
 
-| Variable | Render value / behavior |
+| Variable | Hosted value |
 | --- | --- |
-| `APP_ENV` | `production`; refuses startup without the access password and valid built frontend |
+| `APP_ENV` | `production` |
+| `DATABASE_URL` | Neon pooled connection URI, entered privately in Render |
+| `REQUIRE_POSTGRES` | `true`; prevents accidental ephemeral SQLite storage |
 | `APP_ACCESS_USERNAME` | `reviewer` |
-| `APP_ACCESS_PASSWORD` | Render-generated random secret; at least 16 characters required in production |
-| `DATABASE_URL` | `sqlite:////var/data/resolvedesk.db` — four slashes represent an absolute Unix path |
-| `SEED_DEMO` | `true` for the assessment; idempotently adds missing demo records at startup |
-| `PORT` | Supplied by Render; defaults to 10000 locally |
-| `FRONTEND_DIST` | Set automatically by `backend/start.py` to the repository's compiled `frontend/dist` |
-| `PYTHON_VERSION` | `3.11.14` in the Blueprint; same Python minor as the verified local environment |
-| `NODE_VERSION` | `24` for builds |
+| `APP_ACCESS_PASSWORD` | Random secret generated by Render; minimum 16 characters |
+| `SEED_DEMO` | `true`; non-destructive, idempotent demo seed |
+| `PORT` | Supplied by Render |
+| `FRONTEND_DIST` | Defaults to the compiled `frontend/dist` in `backend/start.py` |
 
-No Groq/AI provider key, external API key, or email service is needed. **Never add the exposed key from chat to this service. Revoke it at its provider.**
+Do not change the Render root directory to `backend`: the build also needs `frontend`. Native Python hosting includes Node/npm. `python backend/start.py` resolves paths, validates the access gate and database settings, initializes tables, optionally seeds and starts one worker. Do not use `--reload` in hosting.
 
-The startup command is **`python backend/start.py`**, run from the repository root. It resolves paths, validates configuration, optionally seeds, then starts one Uvicorn worker on `0.0.0.0` and the platform's port. Do not run the development server or use `--reload` in hosting.
+Database URLs are normalized without losing encoded credentials or SSL options. PostgreSQL uses `NullPool` because Neon's pooled endpoint handles connection pooling, with a finite connection timeout. SQLite connections retain their local foreign-key/timeout settings.
 
-The persistent disk is available only **at runtime**, not during a Render build or pre-deploy command. Initialization/seeding therefore happens in the startup command. Repeated seeding does not overwrite edits, duplicate demo tickets, or restore deleted demo tickets. Set `SEED_DEMO=false` for no new demo records; this does not delete existing ones.
+Setting `SEED_DEMO=false` stops adding demo data but does not delete existing records. Running the seed again does not overwrite edits or restore soft-deleted tickets.
 
-### Health checks
+## Security and data
 
-Render checks **`GET /healthz`** without authentication. A successful database probe returns only `{"status":"ok"}` with HTTP 200. A failed probe returns 503 without exposing database or ticket details. UI, API, assets, and API documentation all require the access password in production; anonymous access returns 401.
+The shared HTTP Basic gate protects the whole hosted demo, not individual customer accounts. Everyone holding its password can view and modify all tickets and internal notes. Actor names remain user-supplied; there is no per-user verified identity, authorization or in-app logout. Use HTTPS, fictional data, a private browser window, and rotate the shared password after the assessment.
 
-## Access/security boundary
+No secret belongs in React's `VITE_` variables. No Groq or other AI-provider key is used. Revoke previously exposed keys at their provider.
 
-The deployment adds a **shared HTTP Basic access gate**, not full application accounts or roles. It covers the entire app, including internal notes and API docs. Browser credentials are reused on same-origin UI/API requests. Render provides HTTPS; never send the production password over plain HTTP or put it in a URL.
+A new Neon database is initialized empty and optionally seeded. **Existing local SQLite tickets are not automatically migrated.** Your local SQLite file is left untouched. If you have important local records, export/migrate them deliberately before changing the local database URL.
 
-- Every person with the shared password can read and modify **all** tickets and notes.
-- Names entered for authors/activity actors remain user-supplied, not verified account identities.
-- There is no per-user audit identity, customer portal isolation, password-reset flow, or granular permission model.
-- There is no in-app logout for browser Basic authentication. Use a private window and close it when done; browser credential caching behavior varies. Rotate the shared password in Render after the demonstration or if shared too widely, then redeploy.
-- Credentials are never placed in React's `VITE_` variables, the source repository, images, or documentation.
-- Responses include no-store caching and security headers. This shared gate is not a substitute for rate limiting, SSO, or proper account authorization for real customer data.
+`create_all` is initialization, not schema migrations. Back up important data and introduce reviewed migrations before making schema-changing updates. For a Neon backup, use its supported export tools or `pg_dump` from a trusted machine, keep the URI out of command history, and store backups privately. No database export is served through this app.
 
-Only use fictional support data for this assessment deployment. For a real production help desk, add account-based access control, protected internal-note permissions, rate limiting, migrations, monitoring, and a reviewed backup/recovery policy first.
+## Verification
 
-## Post-deploy acceptance — must run against the live URL
+Local validation after the switch: **227 backend tests passed, 7 skipped**, run in two serial groups after a combined run timed out. Four skips require a real PostgreSQL test URL; three require unavailable Windows symlink privileges. The existing compiled-production browser test was previously verified, and deployment changes do not change frontend code.
 
-These checks cannot be claimed as passed until the account-owned service exists:
-
-1. Open `/healthz` in a private browser without credentials: HTTP 200, no ticket information.
-2. Open `/` and `/api/tickets` without credentials: a login prompt / HTTP 401, never ticket data.
-3. Log in with the Render-generated credentials and confirm the UI loads, all metrics appear, and seeded agents/tickets are available.
-4. Create a ticket, edit status/priority/assignee, add a public reply and an internal note, and verify their activities.
-5. Search by customer, combine status/priority/assignee filters, sort by priority, and reset.
-6. Copy a ticket detail URL into a fresh tab and refresh it; the React page must render, not return a server 404.
-7. Use **Manual Deploy → Deploy latest commit**, wait for the service to become Live again, and verify the ticket, entries, and history still exist. Demo records should not duplicate.
-8. Confirm resolved tickets are not overdue and that overdue metrics use creation time.
-9. Delete only your test ticket and verify the counts update.
-
-After those pass, record the actual deployment URL and date in the README. Do not commit its access password.
-
-## Local verification of the hosted configuration
-
-No cloud account is needed to test the production build and access gate locally:
+PostgreSQL URL/driver configuration, TLS option preservation, connection settings, safe errors, SQLite regression behavior and the startup PostgreSQL requirement are unit-tested. Real PostgreSQL API tests are included in `backend/tests/test_postgres.py` and run in `.github/workflows/postgres.yml` using a disposable PostgreSQL service. A passing GitHub Actions result is separate from a successful connection to your Neon account; live Neon/Render checks still require account setup.
 
 ```sh
-# frontend/
-npm ci
-npx playwright install chromium
-npm run typecheck:e2e
-npm run test:production
-
-# backend/
+# backend/ — Windows
+.venv/Scripts/python.exe -m pip install -r requirements.txt
 .venv/Scripts/python.exe -m pytest -q
+
+# frontend/ — optional compiled-production browser check
+npm run test:production
 ```
 
-`test:production` builds React, serves that actual compiled bundle through FastAPI with production settings, and runs Chromium using generated runtime-only credentials and an isolated test database. It covers anonymous access denial, health, authenticated UI, ticket creation, an authored internal note, reload persistence, deep links, and metrics. It does not use Vite or a mocked API. Its test servers and database are cleaned up afterward. It is **local production-mode verification**, not proof of a successful Render deployment.
-
-Executed checks for this configuration: **197 backend tests passed, 3 Windows symlink-privilege skips; 31 frontend tests passed; the production Chromium scenario passed; frontend/E2E TypeScript and production build passed; npm audit reported zero vulnerabilities.** The Blueprint also passed validation against Render's published JSON schema. This validates its structure, not account provisioning, billing, regional capacity, or a successful remote build.
-
-Use `.venv/bin/python` on macOS/Linux. Non-Windows execution has not been independently verified here.
-
-## Storage, backups, and operational limits
-
-- Keep **one service instance and one Uvicorn worker** for this assessment configuration. Render disks cannot be shared between instances; do not horizontally scale this SQLite deployment.
-- Disk-backed Render services have **brief downtime during redeploys**; the disk is attached to one instance at a time. No zero-downtime claim is made.
-- Render's daily disk snapshots are not a substitute for database-aware SQLite backups. Use SQLite's online backup API and securely download/store backups separately from the service disk.
-- Example in the Render service's Shell (creates a database backup on the same disk; copy it off-host afterward):
-
-```sh
-python -c "import sqlite3; from pathlib import Path; Path('/var/data/backups').mkdir(exist_ok=True); source=sqlite3.connect('/var/data/resolvedesk.db'); target=sqlite3.connect('/var/data/backups/resolvedesk-backup.db'); source.backup(target); target.close(); source.close()"
-```
-
-Do not copy a live SQLite file blindly, and do not publish backups through the web server. The app serves only the frontend build assets, not the database directory.
-
-Schema creation uses `create_all`, not migrations. Take a backup before schema-changing updates and add reviewed migrations before storing important data. Restoring an older code build does not automatically reverse database changes.
-
-To stop ongoing charges after the assessment, review Render billing and delete the service/Blueprint and disk when no longer needed **after exporting any data you want to retain**. Removing a disk destroys its data; suspending compute alone can leave storage charges.
+For an optional local PostgreSQL test, set `TEST_POSTGRES_URL` **privately** to a dedicated test database and run `python -m pytest tests/test_postgres.py -q -rs`. Tests create/drop an isolated random schema and require CREATE SCHEMA permission. Never use an important production database for testing. Without a test URL, integration tests explicitly skip rather than pretending to pass.
 
 ## Troubleshooting
 
-| Symptom | Check |
+| Symptom | Fix |
 | --- | --- |
-| `APP_ACCESS_PASSWORD` startup error | Generated secret exists, is at least 16 characters, and the service was redeployed after an environment change |
-| `FRONTEND_DIST` startup error | Root directory is the repository root and the build ran `npm run build --prefix frontend` |
-| Database directory not writable | Disk is attached at `/var/data`; do not use pre-deploy seeding or the ephemeral default database |
-| Health check fails | `/healthz` is configured; inspect startup logs and disk/database permissions, not the password-protected API |
-| UI loads but API fails | Use the same service URL and default `/api`; remove stale `VITE_API_BASE_URL` overrides and reauthenticate |
-| Login keeps returning 401 | Username is `reviewer`, password matches the environment, and browser isn't reusing cached old credentials |
-| Tickets disappear after deploy | Confirm `DATABASE_URL` and disk mount exactly match the Blueprint; stop testing with important data until fixed |
-| Old UI after deployment | Confirm the intended commit was manually deployed and refresh; index and API responses use no-store |
-
-### Authoritative platform references
-
-- [Render native runtimes and included Node/npm tools](https://render.com/docs/native-runtimes)
-- [Blueprint specification](https://render.com/docs/blueprint-spec)
-- [Persistent disk guarantees and limitations](https://render.com/docs/disks)
-- [Current pricing](https://render.com/pricing)
-- [Official repository deployment-link format](https://render.com/docs/deploy-to-render)
+| Missing `DATABASE_URL` | Enter Neon URI in Render Environment, not GitHub/source files |
+| `REQUIRE_POSTGRES` rejects SQLite | Use Neon URI; do not fall back to SQLite on Render Free |
+| Database connection fails | Check Neon project is active, correct pooled endpoint/credentials, SSL options, quotas and network status |
+| Build cannot find frontend | Keep Render root at repository root and use Blueprint build command |
+| First request is slow | Expected free-service/database cold start; wait before retrying |
+| Browser keeps asking for login | Use `reviewer` and current generated password; cached browser credentials may require a fresh private window |
+| Database schema changed | Initialization does not migrate existing tables; review migrations instead of deleting customer data |
+| Existing Blueprint didn't request secret | Set new `DATABASE_URL` manually in Environment and redeploy |
+| Unexpected billable service/disk | Stop and inspect existing resources; this Blueprint requests Free and creates no disk/database |

@@ -19,7 +19,7 @@ A complete support desk built for the Comhard Technologies practical assessment:
 
 ## Hosted deployment
 
-**Recommended: one Render Python service with a persistent disk.** The repository is configured and production-mode tested, but **no public deployment is live yet**: a Render account connection and billing approval are still required. Current published baseline is about **$7.25/month** before taxes/usage overages; confirm the current estimate before creating resources.
+**Free setup: Render Free for the app + Neon Free PostgreSQL for persistent data.** No paid disk is configured. Create a Neon Free project, then paste its pooled connection URI **privately into Render's `DATABASE_URL` field** during Blueprint setup. **No public deployment is live yet**; connecting your accounts is still required. Render sleeps after 15 idle minutes, so allow about a minute for cold starts. Stay within both providers' free quotas; see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 [Open Render deployment setup](https://render.com/deploy?repo=https://github.com/Prakhar00001/ResolveDesk) and follow [`DEPLOYMENT.md`](DEPLOYMENT.md). This is a real Blueprint setup link, not a claim of an already-deployed app. Render generates the shared access password; never put it in this README.
 
@@ -29,7 +29,7 @@ A complete support desk built for the Comhard Technologies practical assessment:
 
 - **Python 3.11+** with `pip` and `venv`.
 - **Node.js 24 LTS recommended**, npm. The current test runner supports Node 22.12+, 24+, or 26+; verified here on Node 24.11.0, npm 11.6.1, and Python 3.11.9 on Windows.
-- No separate database server, API keys, credentials, Docker, or cloud account required.
+- No separate database server, API keys, credentials, Docker, or cloud account required for local SQLite development. Free hosting requires Render and Neon accounts.
 - Installing dependencies and Chromium requires internet access. Package versions are locked in `frontend/package-lock.json`.
 
 ## Quick start — Windows / Zed shell
@@ -84,7 +84,8 @@ Templates: [`backend/.env.example`](backend/.env.example) and [`frontend/.env.ex
 | `APP_ACCESS_USERNAME` | `reviewer` | Hosted demo's shared Basic-auth username. |
 | `APP_ACCESS_PASSWORD` | Unset locally | Render generates it; production requires at least 16 characters. Configuring it enables the gate locally too. Never commit it. |
 | `FRONTEND_DIST` | Not hosted by the normal local API command | `backend/start.py` defaults it to the compiled `frontend/dist` directory. |
-| `SEED_DEMO` | `false` in the hosting entry point | Blueprint sets `true`; seeding is idempotent and runs at startup on the persistent disk. |
+| `SEED_DEMO` | `false` in the hosting entry point | Blueprint sets `true`; startup seeding is idempotent and writes to Neon. |
+| `REQUIRE_POSTGRES` | `false` locally | Render Blueprint sets `true` to reject temporary SQLite storage. |
 | `PORT` | `10000` in the hosting entry point | Render supplies its service port. |
 
 Vite proxies `/api` to `http://localhost:8000` during development (and Vite preview). The production static bundle does **not** include that proxy. The Render setup serves compiled React and the API through the same FastAPI service, so no production proxy or CORS changes are needed. API CORS permits localhost/127.0.0.1 frontend origins on ports 5173 and 4173. For different hosts, update the backend origin allowlist or serve both behind a same-origin reverse proxy.
@@ -163,7 +164,7 @@ Each mutation and related activity insertion share a transaction. Request sessio
 
 `create_all` initializes new databases; it is **not schema migration tooling**. If an existing database predates a schema change, preserve it and migrate/rebuild the affected tables, or initialize a separate demo database. Existing tables are not silently recreated. For a production schema lifecycle, introduce reviewed Alembic migrations.
 
-Database access is isolated behind SQLAlchemy and `DATABASE_URL`; SQLite-specific connection settings are scoped to the SQLite dialect. PostgreSQL adoption would require installing a PostgreSQL driver, migrating data/schema, reviewing UTC/constraint behavior, and rerunning the suite against PostgreSQL. PostgreSQL is **not claimed as tested or ready out of the box**.
+Database access is isolated behind SQLAlchemy and `DATABASE_URL`. Local SQLite remains the default; free hosting uses Neon PostgreSQL through psycopg 3. Standard PostgreSQL/Neon URLs and SSL options are supported, with `NullPool` for external pooling and a finite connection timeout. PostgreSQL integration tests run with `TEST_POSTGRES_URL` and are configured in `.github/workflows/postgres.yml`. Local driver/configuration tests passed; real PostgreSQL tests explicitly skip without a test server. Existing SQLite data is not automatically migrated.
 
 ## Testing
 
@@ -197,7 +198,7 @@ On Linux CI you may need `npx playwright install --with-deps chromium` with suit
 
 ### Executed verification
 
-- **197 backend tests passed, 3 skipped:** CRUD, required-field/enum/email validation, chronological ordering, actual-change audit logging, transaction rollback, SQL AND filters and priority sorting, dashboard counts, strict overdue boundaries, foreign keys, soft deletion, seed idempotence, safe errors, real HTTP persistence across backend restarts, hosted access protection, secure frontend serving, health checks, and production entry-point validation. The three skips require symlink privileges unavailable on this Windows machine.
+- **227 backend tests passed, 7 skipped** in two serial groups after a combined run timed out: CRUD, required-field/enum/email validation, chronological ordering, actual-change audit logging, transaction rollback, SQL AND filters and priority sorting, dashboard counts, strict overdue boundaries, foreign keys, soft deletion, seed idempotence, safe errors, real HTTP persistence across backend restarts, hosted access protection, secure frontend serving, health checks, and production entry-point validation. Three skips require unavailable Windows symlink privileges; four PostgreSQL integration tests require `TEST_POSTGRES_URL`. New checks cover PostgreSQL URL/driver/SSL handling, connection settings, safe errors, and fail-closed hosted database validation.
 - **31 frontend tests:** API contracts/errors, input limits/validation, timestamps, timelines, component workflows, and rapid filter/reset/back-navigation regressions.
 - **3 development-mode live Chromium scenarios:** full ticket lifecycle; search, combined filters, sorting and rapid control changes; metric refresh after external mutation. These include desktop/tablet screenshots with no document overflow at 1440px and 768px.
 - **1 production-mode live Chromium scenario:** the actual compiled React build served by FastAPI, anonymous access blocked, authenticated ticket creation and internal note, reload persistence, fresh detail deep-link navigation, and metrics. Run with `npm run test:production` from `frontend/`.
@@ -228,13 +229,13 @@ All mandatory features in the supplied textual brief are implemented and covered
 
 ## Deployment guidance
 
-See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the complete Render launch procedure, cost review, generated password, verification checklist, backups, and troubleshooting.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the fast Render Free + Neon Free setup, generated password, free-tier limits, verification checklist, and troubleshooting.
 
 - Root [`render.yaml`](render.yaml) builds React and FastAPI in one native Python service. [`backend/start.py`](backend/start.py) validates production configuration, optionally seeds, and starts one worker on the platform port.
-- The attached disk is mounted at `/var/data`; `DATABASE_URL=sqlite:////var/data/resolvedesk.db` preserves tickets across deploys/restarts. A free ephemeral filesystem is **not** a durable deployment.
+- There is no paid disk. Neon stores data independently of Render's ephemeral filesystem; set its pooled URI directly in Render's private `DATABASE_URL`. `REQUIRE_POSTGRES=true` prevents accidental SQLite fallback.
 - HTTPS is provided by Render. A generated shared access password protects UI, assets, API, and docs; only the minimal `/healthz` probe is public. Startup fails closed without a suitable password and compiled frontend.
-- Automatic deploys are off. Use Manual Deploy for reviewed changes. Disk-backed redeploys have brief downtime; this setup does not support horizontal scaling.
-- Local production checks passed, but **Render provisioning and live-URL verification are pending account connection and billing approval**. No real public URL is fabricated here.
+- Automatic deploys are off. Use Manual Deploy for reviewed changes. Render Free sleeps while idle and both providers impose usage quotas; this is an assessment demo, not an uptime-guaranteed production deployment.
+- Local configuration checks passed; **live PostgreSQL/Neon verification and Render provisioning require account setup**. PostgreSQL CI is configured separately. No real public URL or unexecuted database-test success is fabricated here.
 - Use fictional assessment data only. Real customer use still needs per-user authorization, rate limiting, reviewed migrations, backups, and monitoring. No secret belongs in `VITE_` variables.
 
 ## AI tools usage
